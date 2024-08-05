@@ -1,3 +1,4 @@
+# utils.py
 from bs4 import BeautifulSoup
 import requests
 import time
@@ -29,24 +30,28 @@ def is_allowed_by_robots(url, user_agent='AccessibilityAnalysisTool'):
     except requests.RequestException:
         return False
 
-def fetch_html_content(html_or_url):
-    if html_or_url.startswith(('http://', 'https://')):
-        if not is_allowed_by_robots(html_or_url):
+def fetch_html_content(html_url):
+    html_url = str(html_url)
+    if html_url.startswith(('http://', 'https://')):
+        if not is_allowed_by_robots(html_url):
             return None
         headers = {'User-Agent': 'AccessibilityAnalysisTool/1.0'}
         try:
-            response = requests.get(html_or_url, headers=headers)
+            response = requests.get(html_url, headers=headers)
             response.raise_for_status()
             time.sleep(1)  # Rate limiting: sleep for 1 second between requests
             return response.text
         except requests.RequestException:
             return None
-    return html_or_url
+    return html_url
 
 def check_labels(html):
+    from collections import Counter
+    
     soup = BeautifulSoup(html, 'html.parser')
     fields = soup.find_all(['input', 'textarea', 'select'])
     report = []
+    error_summary = Counter()
 
     for field in fields:
         field_id = field.get('id')
@@ -63,26 +68,37 @@ def check_labels(html):
         suggestions = []
         if not label and not has_aria_label:
             suggestions.append('Add a label element associated with this field or an aria-label attribute.')
+            error_summary['missing_label_or_aria'] += 1
 
         if surrounding_text and not has_aria_label:
             suggestions.append('Consider providing additional context with aria-label or aria-describedby.')
+            error_summary['missing_contextual_aria'] += 1
 
         if field.get('placeholder'):
             suggestions.append('Do not use placeholder as a substitute for labels.')
+            error_summary['placeholder_as_label'] += 1
 
         if field.get('required'):
             suggestions.append('Ensure the required field is clearly indicated.')
+            error_summary['required_field_indication'] += 1
 
         fieldset = field.find_parent('fieldset')
         if fieldset and not fieldset.find('legend'):
             suggestions.append('Add a legend element to the fieldset to describe the group of related fields.')
+            error_summary['missing_legend'] += 1
 
         form = field.find_parent('form')
         if form and not form.find('p'):
             suggestions.append('Provide clear instructions and guidance for filling out the form.')
+            error_summary['missing_instructions'] += 1
 
         if field.get('aria-invalid'):
             suggestions.append('Ensure the form has proper error handling and messages.')
+            error_summary['aria_invalid_error_handling'] += 1
+
+        if not field.get('autocomplete'):
+            suggestions.append('Add an appropriate autocomplete attribute to this field.')
+            error_summary['missing_autocomplete'] += 1
 
         report.append({
             'field': str(field),
@@ -91,4 +107,4 @@ def check_labels(html):
             'context': surrounding_text
         })
 
-    return report
+    return report, error_summary
