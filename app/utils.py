@@ -2,6 +2,8 @@
 from bs4 import BeautifulSoup
 import requests
 import time
+# import httpx
+# import asyncio
 from urllib.parse import urlparse, urljoin
 
 def is_allowed_by_robots(url, user_agent='AccessibilityAnalysisTool'):
