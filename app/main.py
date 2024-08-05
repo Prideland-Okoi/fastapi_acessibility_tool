@@ -14,8 +14,7 @@ def ensure_url_scheme(url: str) -> str:
         return urlunparse(parsed_url._replace(scheme='http'))
     return url
 
-# @app.post("/check")
-@app.api_route("/check", methods=["GET", "POST"])
+@app.post("/check")
 async def check(url: Optional[str] = Form(None)):
     if url:
         url = ensure_url_scheme(url)
